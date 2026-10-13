@@ -4,7 +4,13 @@ import re
 
 
 # Load the AI model once
-model = SentenceTransformer("all-MiniLM-L6-v2")
+model = None
+
+def get_model():
+    global model
+    if model is None:
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+    return model
 
 
 # Minimum score required to display a match
@@ -31,9 +37,11 @@ def calculate_text_similarity(text1: str, text2: str) -> float:
     if not text1.strip() or not text2.strip():
         return 0.0
 
-    embeddings = model.encode(
-        [text1, text2],
-        normalize_embeddings=True
+    current_model = get_model()
+
+    embeddings = current_model.encode(
+            [text1, text2],
+            normalize_embeddings=True
     )
 
     similarity = cosine_similarity(
