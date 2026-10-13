@@ -12,7 +12,9 @@ function App() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const API_URL = "http://127.0.0.1:8000";
+  
+const API_URL = "https://findit-ai-lost-and-found.onrender.com";
+
 
   async function handleSubmit(event) {
     event.preventDefault();
