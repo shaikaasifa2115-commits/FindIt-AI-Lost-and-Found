@@ -3,7 +3,6 @@ fastapi
 uvicorn[standard]
 pymongo[srv]
 python-multipart
-sentence-transformers
 scikit-learn
 numpy
 python-dotenv

@@ -1,23 +1,7 @@
 
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import re
-
-
-# Load the AI model only when a similarity calculation is needed
-model = None
-
-
-def get_model():
-    global model
-
-    if model is None:
-        model = SentenceTransformer(
-            "all-MiniLM-L6-v2",
-            device="cpu"
-        )
-
-    return model
 
 
 # Minimum score required to display a match
@@ -25,7 +9,7 @@ MIN_MATCH_SCORE = 50.0
 
 
 def normalize_text(text: str) -> str:
-    """Normalize text to make comparisons consistent."""
+    """Normalize text for consistent comparison."""
     text = str(text or "").lower().strip()
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"[^\w\s]", "", text)
@@ -33,63 +17,60 @@ def normalize_text(text: str) -> str:
 
 
 def calculate_text_similarity(text1: str, text2: str) -> float:
-    """
-    Calculate semantic similarity between two text values.
-    Returns a score between 0 and 100.
-    """
-    if not str(text1 or "").strip() or not str(text2 or "").strip():
+    """Calculate text similarity using TF-IDF and cosine similarity."""
+
+    text1 = normalize_text(text1)
+    text2 = normalize_text(text2)
+
+    if not text1 or not text2:
         return 0.0
 
-    current_model = get_model()
+    try:
+        vectorizer = TfidfVectorizer()
+        vectors = vectorizer.fit_transform([text1, text2])
 
-    embeddings = current_model.encode(
-        [text1, text2],
-        normalize_embeddings=True,
-        convert_to_numpy=True
-    )
+        similarity = cosine_similarity(
+            vectors[0:1],
+            vectors[1:2]
+        )[0][0]
 
-    similarity = cosine_similarity(
-        [embeddings[0]],
-        [embeddings[1]]
-    )[0][0]
+        return round(max(0.0, float(similarity)) * 100, 2)
 
-    score = max(0.0, float(similarity)) * 100
-
-    return round(min(score, 100.0), 2)
+    except ValueError:
+        return 0.0
 
 
 def create_item_text(item: dict) -> str:
-    """Create a combined text representation of an item."""
+    """Combine item information into searchable text."""
     return (
-        f"Item name: {item.get('item_name', '')}. "
-        f"Description: {item.get('description', '')}. "
-        f"Location: {item.get('location', '')}."
+        f"{item.get('item_name', '')} "
+        f"{item.get('description', '')} "
+        f"{item.get('location', '')}"
     )
 
 
 def calculate_item_similarity(item1: dict, item2: dict) -> float:
     """
-    Compare item names, descriptions, and locations separately.
+    Compare item names, descriptions and locations.
 
-    Name:        50%
+    Name: 50%
     Description: 35%
-    Location:    15%
+    Location: 15%
     """
-    name1 = str(item1.get("item_name", "") or "").strip()
-    name2 = str(item2.get("item_name", "") or "").strip()
 
-    description1 = str(item1.get("description", "") or "").strip()
-    description2 = str(item2.get("description", "") or "").strip()
-
-    location1 = str(item1.get("location", "") or "").strip()
-    location2 = str(item2.get("location", "") or "").strip()
-
-    name_score = calculate_text_similarity(name1, name2)
-    description_score = calculate_text_similarity(
-        description1, description2
+    name_score = calculate_text_similarity(
+        item1.get("item_name", ""),
+        item2.get("item_name", "")
     )
+
+    description_score = calculate_text_similarity(
+        item1.get("description", ""),
+        item2.get("description", "")
+    )
+
     location_score = calculate_text_similarity(
-        location1, location2
+        item1.get("location", ""),
+        item2.get("location", "")
     )
 
     final_score = (
@@ -102,7 +83,7 @@ def calculate_item_similarity(item1: dict, item2: dict) -> float:
 
 
 def create_duplicate_key(item: dict) -> tuple:
-    """Identify repeated item reports using normalized text."""
+    """Identify duplicate reports by item details."""
     return (
         normalize_text(item.get("item_name", "")),
         normalize_text(item.get("description", "")),
@@ -111,14 +92,13 @@ def create_duplicate_key(item: dict) -> tuple:
 
 
 def find_matching_items(lost_item: dict, found_items: list) -> list:
-    """
-    Find relevant matching items using semantic similarity,
-    duplicate removal, a minimum score, and descending sorting.
-    """
+    """Find and rank similar items."""
+
     matches = []
     seen_items = set()
 
     for candidate in found_items:
+
         if "_id" not in candidate:
             continue
 
@@ -129,7 +109,10 @@ def find_matching_items(lost_item: dict, found_items: list) -> list:
 
         seen_items.add(duplicate_key)
 
-        score = calculate_item_similarity(lost_item, candidate)
+        score = calculate_item_similarity(
+            lost_item,
+            candidate
+        )
 
         if score < MIN_MATCH_SCORE:
             continue
