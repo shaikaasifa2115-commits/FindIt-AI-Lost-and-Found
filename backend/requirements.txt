@@ -6,3 +6,4 @@ python-multipart
 sentence-transformers
 scikit-learn
 numpy
+python-dotenv
